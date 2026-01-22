@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "manual_ea528ead",
+  "session_id": "demo_session_001",
+  "timestamp": "2026-01-22T22:21:36.976331",
+  "data": {
+    "manual": true,
+    "user_action": "save_point",
+    "value": "manual_save"
+  },
+  "metadata": {
+    "created_at": "2026-01-22T22:21:36.976331",
+    "version": "1.0",
+    "environment": "manual",
+    "user_id": "demo_user",
+    "description": "Manual save during demo",
+    "manual_created": true
+  }
+}

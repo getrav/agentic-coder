@@ -1,0 +1,17 @@
+{
+  "checkpoint_id": "auto_63d4fb86",
+  "session_id": "demo_session_001",
+  "timestamp": "2026-01-22T22:21:36.974997",
+  "data": {
+    "auto": true,
+    "trigger": "timer",
+    "value": "auto_generated"
+  },
+  "metadata": {
+    "created_at": "2026-01-22T22:21:36.974997",
+    "version": "1.0",
+    "environment": "auto",
+    "trigger_event": "timer",
+    "auto_generated": true
+  }
+}
