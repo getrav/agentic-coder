@@ -1,7 +1,6 @@
 """Inter-agent message bus for pub/sub communication."""
 
 import asyncio
-import json
 import logging
 from typing import Any, Dict, List, Optional, Set, Callable, Awaitable
 from dataclasses import dataclass, field

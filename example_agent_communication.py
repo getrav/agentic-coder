@@ -179,7 +179,8 @@ async def main():
         
         # 3. Check message history
         logger.info("\n3. Checking message history...")
-        message_bus = handler.message_bus
+        from src.agent_communication import get_message_bus
+        message_bus = get_message_bus()
         history = message_bus.get_message_history()
         
         logger.info(f"Total messages in history: {len(history)}")
