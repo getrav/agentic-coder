@@ -67,7 +67,7 @@ class BeadsClient:
             
             stdout, stderr = await process.communicate()
             
-            return_code = process.returncode or 0
+            return_code = process.returncode if process.returncode is not None else -1
             return CommandResult(
                 stdout=stdout.decode('utf-8'),
                 stderr=stderr.decode('utf-8'),
