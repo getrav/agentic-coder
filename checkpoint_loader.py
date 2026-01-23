@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timedelta
 import threading
 from checkpoint_model import Checkpoint, CheckpointMetadata
+from structured_logger import get_logger, LogLevel
 
 
 class CheckpointLoader:
@@ -18,6 +19,7 @@ class CheckpointLoader:
         self._cache = {}
         self._cache_timestamps = {}
         self._lock = threading.RLock()
+        self.logger = get_logger("checkpoint_loader")
     
     def load_checkpoint(self, checkpoint_id: str, 
                        use_cache: bool = True,
@@ -28,24 +30,37 @@ class CheckpointLoader:
             cached_data = self._get_from_cache(checkpoint_id)
             if cached_data is not None:
                 if validate and not self._validate_checkpoint_data(cached_data):
-                    print(f"Cached checkpoint {checkpoint_id} failed validation")
+                    self.logger.warn("Cached checkpoint failed validation", 
+                                   checkpoint_id=checkpoint_id,
+                                   action="cache_validation_failed")
                     return None
+                self.logger.debug("Loaded checkpoint from cache", 
+                                checkpoint_id=checkpoint_id,
+                                action="cache_hit")
                 return cached_data
         
         # Load from persistence
         checkpoint_data = self.persistence.load_checkpoint(checkpoint_id)
         
         if checkpoint_data is None:
+            self.logger.warn("Checkpoint not found", 
+                            checkpoint_id=checkpoint_id,
+                            action="load_failed_not_found")
             return None
         
         if validate and not self._validate_checkpoint_data(checkpoint_data):
-            print(f"Checkpoint {checkpoint_id} failed validation")
+            self.logger.warn("Checkpoint failed validation", 
+                            checkpoint_id=checkpoint_id,
+                            action="load_validation_failed")
             return None
         
         # Update cache
         if use_cache:
             self._add_to_cache(checkpoint_id, checkpoint_data)
         
+        self.logger.debug("Loaded checkpoint from persistence", 
+                          checkpoint_id=checkpoint_id,
+                          action="load_success")
         return checkpoint_data
     
     def load_session_checkpoints(self, session_id: str,

@@ -22,12 +22,21 @@ from checkpoint_model import Checkpoint, CheckpointManager as CheckpointModelMan
 from checkpoint_saver import CheckpointSaver
 from checkpoint_loader import CheckpointLoader
 from checkpoint_manager import CheckpointManager
+from structured_logger import get_logger, LogConfig, LogLevel
 
 
 def main():
     """Demonstrate the checkpoint persistence system functionality."""
-    print("SQLite Checkpoint Persistence System Demo")
-    print("=" * 50)
+    # Configure structured logging
+    logger_config = LogConfig(
+        level=LogLevel.INFO,
+        format_json=True,
+        output_file="logs/demo.log"
+    )
+    logger = get_logger("demo", logger_config)
+    
+    logger.info("SQLite Checkpoint Persistence System Demo", 
+                component="main", action="start_demo")
     
     # Initialize components
     db_path = "demo_checkpoints.db"
@@ -36,18 +45,20 @@ def main():
     loader = CheckpointLoader(db_path)
     manager = CheckpointManager(db_path)
     
-    print(f"Database path: {db_path}")
-    print()
+    logger.info("Components initialized", 
+                database_path=db_path, 
+                components=["persistence", "saver", "loader", "manager"])
     
     # Demo 1: Basic checkpoint operations
-    print("1. Basic Checkpoint Operations")
-    print("-" * 30)
+    logger.info("Starting basic checkpoint operations", 
+                demo_section="basic_operations", step=1)
     
     # Create a session
     session_id = "demo_session_001"
-    print(f"Session ID: {session_id}")
+    logger.info("Created session", session_id=session_id)
     
     # Save some checkpoints
+    saved_count = 0
     for i in range(3):
         checkpoint_id = f"demo_checkpoint_{i}"
         data = {
@@ -63,66 +74,92 @@ def main():
         success = persistence.save_checkpoint(
             checkpoint_id, session_id, data, data["metadata"]
         )
-        print(f"  Saved checkpoint {checkpoint_id}: {'✓' if success else '✗'}")
+        if success:
+            saved_count += 1
+            logger.info("Checkpoint saved successfully", 
+                       checkpoint_id=checkpoint_id, 
+                       session_id=session_id, 
+                       step=i+1)
+        else:
+            logger.error("Failed to save checkpoint", 
+                        checkpoint_id=checkpoint_id, 
+                        session_id=session_id, 
+                        step=i+1)
     
-    print()
+    logger.info("Basic checkpoint operations completed", 
+                total_attempted=3, 
+                total_saved=saved_count, 
+                success_rate=saved_count/3)
     
     # Demo 2: Enhanced saving features
-    print("2. Enhanced Checkpoint Saving")
-    print("-" * 30)
+    logger.info("Starting enhanced checkpoint saving", 
+                demo_section="enhanced_saving", step=2)
     
     # Auto checkpoint
     auto_data = {"auto": True, "trigger": "timer", "value": "auto_generated"}
     auto_checkpoint_id = saver.save_auto_checkpoint(session_id, auto_data, "timer")
-    print(f"  Auto checkpoint: {auto_checkpoint_id}")
+    logger.info("Auto checkpoint saved", 
+               checkpoint_id=auto_checkpoint_id, 
+               session_id=session_id, 
+               trigger="timer")
     
     # Manual checkpoint
     manual_data = {"manual": True, "user_action": "save_point", "value": "manual_save"}
     manual_checkpoint_id = saver.save_manual_checkpoint(
         session_id, manual_data, "demo_user", "Manual save during demo"
     )
-    print(f"  Manual checkpoint: {manual_checkpoint_id}")
-    
-    print()
+    logger.info("Manual checkpoint saved", 
+               checkpoint_id=manual_checkpoint_id, 
+               session_id=session_id, 
+               user="demo_user",
+               description="Manual save during demo")
     
     # Demo 3: Loading and querying
-    print("3. Checkpoint Loading and Querying")
-    print("-" * 30)
+    logger.info("Starting checkpoint loading and querying", 
+                demo_section="loading_querying", step=3)
     
     # Load all checkpoints for session
     session_checkpoints = loader.load_session_checkpoints(session_id)
-    print(f"  Total checkpoints in session: {len(session_checkpoints)}")
+    logger.info("Loaded session checkpoints", 
+               session_id=session_id, 
+               checkpoint_count=len(session_checkpoints))
     
     # Load latest checkpoint
     latest_checkpoint = loader.load_latest_checkpoint(session_id)
     if latest_checkpoint:
-        print(f"  Latest checkpoint: {latest_checkpoint['checkpoint_id']}")
-        print(f"    Timestamp: {latest_checkpoint['timestamp']}")
+        logger.info("Loaded latest checkpoint", 
+                   session_id=session_id,
+                   checkpoint_id=latest_checkpoint['checkpoint_id'],
+                   timestamp=latest_checkpoint['timestamp'])
+    else:
+        logger.warn("No latest checkpoint found", session_id=session_id)
     
     # Search checkpoints
     search_results = loader.search_checkpoints(session_id, "manual")
-    print(f"  Checkpoints containing 'manual': {len(search_results)}")
-    
-    print()
+    logger.info("Searched checkpoints", 
+               session_id=session_id, 
+               search_term="manual", 
+               results_count=len(search_results))
     
     # Demo 4: Checkpoint management
-    print("4. Checkpoint Management")
-    print("-" * 30)
+    logger.info("Starting checkpoint management", 
+                demo_section="checkpoint_management", step=4)
     
     # Get storage statistics
     stats = manager.get_storage_stats()
-    print(f"  Total checkpoints: {stats['checkpoints']['total_count']}")
-    print(f"  Database size: {stats['database']['size_mb']} MB")
+    logger.info("Retrieved storage statistics", 
+               total_checkpoints=stats['checkpoints']['total_count'],
+               database_size_mb=stats['database']['size_mb'])
     
     # Backup and cleanup
     cleanup_result = manager.cleanup_by_size_limit(max_checkpoints=5)
-    print(f"  Size limit cleanup: {cleanup_result.get('deleted_count', 0)} deleted")
-    
-    print()
+    logger.info("Performed cleanup by size limit", 
+               max_checkpoints=5, 
+               deleted_count=cleanup_result.get('deleted_count', 0))
     
     # Demo 5: Batch operations
-    print("5. Batch Operations")
-    print("-" * 30)
+    logger.info("Starting batch operations", 
+                demo_section="batch_operations", step=5)
     
     # Create another session for batch demo
     batch_session = "batch_demo_session"
@@ -141,20 +178,26 @@ def main():
     
     # Save in batch
     batch_results = saver.batch_save_checkpoints(batch_checkpoints)
-    print(f"  Batch save results: {len(batch_results)} checkpoints")
     success_count = sum(1 for result in batch_results.values() if result)
-    print(f"  Successfully saved: {success_count}/{len(batch_results)}")
+    logger.info("Batch save completed", 
+               session_id=batch_session, 
+               attempted=len(batch_results), 
+               successful=success_count,
+               success_rate=success_count/len(batch_results))
     
     # Load in batch
     checkpoint_ids = [f'batch_{i}' for i in range(5)]
     batch_load_results = loader.batch_load_checkpoints(checkpoint_ids)
-    print(f"  Batch load results: {len(batch_load_results)} checkpoints")
-    
-    print()
+    loaded_count = sum(1 for result in batch_load_results.values() if result is not None)
+    logger.info("Batch load completed", 
+               session_id=batch_session,
+               attempted=len(checkpoint_ids), 
+               successful=loaded_count,
+               success_rate=loaded_count/len(checkpoint_ids))
     
     # Demo 6: Checkpoint model usage
-    print("6. Checkpoint Data Model")
-    print("-" * 30)
+    logger.info("Starting checkpoint data model demo", 
+                demo_section="data_model", step=6)
     
     # Create checkpoint using data model
     checkpoint_data = {
@@ -167,17 +210,18 @@ def main():
     
     try:
         checkpoint = Checkpoint.from_dict(checkpoint_data)
-        print(f"  Checkpoint model created: {checkpoint.checkpoint_id}")
-        print(f"  Session: {checkpoint.session_id}")
-        print(f"  Data: {checkpoint.data}")
+        logger.info("Checkpoint model created successfully", 
+                   checkpoint_id=checkpoint.checkpoint_id,
+                   session_id=checkpoint.session_id,
+                   data_keys=list(checkpoint.data.keys()))
     except ValueError as e:
-        print(f"  Model creation failed: {e}")
-    
-    print()
+        logger.error("Checkpoint model creation failed", 
+                    checkpoint_data=checkpoint_data, 
+                    error=str(e))
     
     # Demo 7: Maintenance operations
-    print("7. System Maintenance")
-    print("-" * 30)
+    logger.info("Starting system maintenance", 
+                demo_section="maintenance", step=7)
     
     # Run comprehensive maintenance
     maintenance_config = {
@@ -189,26 +233,31 @@ def main():
     
     maintenance_result = manager.run_maintenance(maintenance_config)
     if 'error' not in maintenance_result:
-        print("  Maintenance completed successfully")
-        print(f"  Results: {len(maintenance_result['results'])} operations")
+        logger.info("Maintenance completed successfully", 
+                   operations_count=len(maintenance_result['results']),
+                   config=maintenance_config)
     else:
-        print(f"  Maintenance failed: {maintenance_result['error']}")
+        logger.error("Maintenance failed", 
+                    config=maintenance_config, 
+                    error=maintenance_result['error'])
     
     # Final statistics
     final_stats = manager.get_storage_stats()
-    print(f"  Final checkpoint count: {final_stats['checkpoints']['total_count']}")
-    print(f"  Final database size: {final_stats['database']['size_mb']} MB")
+    logger.info("Final system statistics", 
+               final_checkpoint_count=final_stats['checkpoints']['total_count'],
+               final_database_size_mb=final_stats['database']['size_mb'],
+               database_path=db_path,
+               backup_path=manager.backup_path)
     
-    print()
-    print("Demo completed successfully!")
-    print(f"Database file: {db_path}")
-    print(f"Backup directory: {manager.backup_path}")
+    logger.info("Demo completed successfully", 
+                total_demos=7, 
+                final_status="success")
 
 
 def run_tests():
     """Run the test suite."""
-    print("Running Checkpoint Persistence Tests")
-    print("=" * 40)
+    logger = get_logger("test_runner")
+    logger.info("Running Checkpoint Persistence Tests", action="test_execution_start")
     
     try:
         import test_checkpoint_persistence
@@ -234,33 +283,38 @@ def run_tests():
         runner = unittest.TextTestRunner(verbosity=2)
         result = runner.run(suite)
         
-        print()
         if result.wasSuccessful():
-            print("All tests passed! ✓")
+            logger.info("All tests passed successfully", 
+                       total_tests=result.testsRun,
+                       failures=0,
+                       errors=0)
         else:
-            print(f"Tests failed: {len(result.failures)} failures, {len(result.errors)} errors")
+            logger.error("Tests failed", 
+                        total_tests=result.testsRun,
+                        failures=len(result.failures),
+                        errors=len(result.errors),
+                        failure_details=[str(failure) for failure in result.failures])
         
         return result.wasSuccessful()
     except Exception as e:
-        print(f"Test execution failed: {e}")
+        logger.exception("Test execution failed", exception=e)
         return False
 
 
 def usage():
     """Print usage information."""
-    print("SQLite Checkpoint Persistence System")
-    print()
-    print("Usage:")
-    print("  python main.py demo    - Run the demo")
-    print("  python main.py test    - Run the tests")
-    print("  python main.py help    - Show this help")
-    print()
-    print("Components:")
-    print("  - CheckpointPersistence: Basic SQLite operations")
-    print("  - CheckpointSaver: Enhanced saving with validation")
-    print("  - CheckpointLoader: Loading with caching and search")
-    print("  - CheckpointManager: Cleanup and management utilities")
-    print("  - Checkpoint: Data model for checkpoints")
+    logger = get_logger("usage")
+    logger.info("SQLite Checkpoint Persistence System")
+    logger.info("Usage:")
+    logger.info("  python main.py demo    - Run the demo")
+    logger.info("  python main.py test    - Run the tests")
+    logger.info("  python main.py help    - Show this help")
+    logger.info("Components:")
+    logger.info("  - CheckpointPersistence: Basic SQLite operations")
+    logger.info("  - CheckpointSaver: Enhanced saving with validation")
+    logger.info("  - CheckpointLoader: Loading with caching and search")
+    logger.info("  - CheckpointManager: Cleanup and management utilities")
+    logger.info("  - Checkpoint: Data model for checkpoints")
 
 
 if __name__ == "__main__":

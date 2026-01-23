@@ -1,6 +1,7 @@
 from typing import Dict, List, Any, Optional, Callable, TypedDict
 from dataclasses import dataclass
 from enum import Enum
+from structured_logger import get_logger, LogLevel
 
 class AgentState(Enum):
     PENDING = "pending"
@@ -44,10 +45,12 @@ class LangGraphSupervisorAgent:
         self.agents: Dict[str, Callable] = {}
         self.graph = WorkflowGraph()
         self.workflow_state: Dict[str, Any] = {}
+        self.logger = get_logger("langgraph_supervisor")
         
     def register_agent(self, name: str, agent_func: Callable):
         """Register an agent with the supervisor"""
         self.agents[name] = agent_func
+        self.logger.debug("Agent registered", agent_name=name)
         
     def create_workflow(self):
         """Create a sample workflow graph"""
@@ -106,17 +109,29 @@ class LangGraphSupervisorAgent:
         node.state = AgentState.RUNNING
         node.input_data = input_data
         
+        self.logger.info("Executing node", 
+                        node_name=node_name, 
+                        state="running",
+                        input_keys=list(input_data.keys()))
+        
         try:
             if node_name in self.agents:
                 result = self.agents[node_name](input_data)
                 node.output_data = result
                 node.state = AgentState.COMPLETED
+                self.logger.debug("Node execution completed", 
+                                 node_name=node_name,
+                                 state="completed")
                 return result
             else:
                 raise Exception(f"Agent {node_name} not found")
         except Exception as e:
             node.state = AgentState.FAILED
             node.error = str(e)
+            self.logger.error("Node execution failed", 
+                            node_name=node_name,
+                            state="failed",
+                            error=str(e))
             raise
     
     def run_workflow(self, initial_input: Dict[str, Any], max_iterations: int = 20) -> Dict[str, Any]:
@@ -133,6 +148,11 @@ class LangGraphSupervisorAgent:
         
         current_nodes: List[str] = [self.graph.start_node]
         iteration = 0
+        
+        self.logger.info("Starting workflow execution",
+                        start_node=self.graph.start_node,
+                        initial_input_keys=list(initial_input.keys()),
+                        max_iterations=max_iterations)
         
         while current_nodes and iteration < max_iterations:
             iteration += 1
@@ -180,17 +200,26 @@ class LangGraphSupervisorAgent:
             if not current_nodes:
                 break
         
-        return {
+        result = {
             "workflow_state": self.workflow_state,
             "execution_log": execution_log,
             "completed_nodes": list(completed_nodes),
             "total_iterations": iteration
         }
+        
+        self.logger.info("Workflow execution completed",
+                        completed_nodes_count=len(completed_nodes),
+                        total_iterations=iteration,
+                        execution_log_entries=len(execution_log))
+        
+        return result
 
 # Example agents for the workflow
 def input_processing_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Process and validate input data"""
-    print("🔄 Input Processing: Processing input data...")
+    logger = get_logger("input_processing_agent")
+    logger.info("Processing input data", 
+               input_keys=list(input_data.keys()))
     
     # Simulate input validation
     raw_input = input_data.get("data", {})
@@ -204,11 +233,16 @@ def input_processing_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     input_data["input_valid"] = True
     input_data["data_quality"] = "good"
     
+    logger.debug("Input processing completed", 
+                processed_keys=list(processed.keys()),
+                quality_score=processed["quality_score"])
+    
     return {"processed_input": processed}
 
 def analysis_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze the processed input"""
-    print("🔍 Analysis: Analyzing data...")
+    logger = get_logger("analysis_agent")
+    logger.info("Analyzing input data")
     
     analysis = {
         "complexity": "medium",
@@ -219,6 +253,11 @@ def analysis_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     
     input_data["analysis_complete"] = True
     input_data["requires_execution"] = True
+    
+    logger.debug("Analysis completed", 
+                complexity=analysis["complexity"],
+                risk_level=analysis["risk_level"],
+                confidence=analysis["confidence"])
     
     return {"analysis_result": analysis}
 
@@ -237,7 +276,8 @@ def decision_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
 def execution_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Execute the main task"""
-    print("⚡ Execution: Running main task...")
+    logger = get_logger("execution_agent")
+    logger.info("Executing main task")
     
     execution = {
         "output_items": 10,
@@ -248,6 +288,11 @@ def execution_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     
     input_data["execution_complete"] = True
     input_data["ready_for_output"] = True
+    
+    logger.debug("Task execution completed", 
+                output_items=execution["output_items"],
+                success_rate=execution["success_rate"],
+                processing_time=execution["processing_time"])
     
     return {"execution_result": execution}
 
@@ -304,23 +349,30 @@ if __name__ == "__main__":
         "priority": "high"
     }
     
-    print("🚀 Starting LangGraph-style Supervised Workflow...")
+    logger = get_logger("demo")
+    logger.info("Starting LangGraph-style Supervised Workflow",
+               demo_type="langgraph_supervisor")
+    
     result = supervisor.run_workflow(initial_input)
+    
+    logger.info("Workflow execution summary",
+               completed_nodes_count=len(result['completed_nodes']),
+               total_iterations=result['total_iterations'],
+               execution_log_entries=len(result['execution_log']))
+    
+    # Log execution details
+    for log_entry in result['execution_log']:
+        logger.debug("Execution detail",
+                    iteration=log_entry['iteration'],
+                    node=log_entry['node'],
+                    status=log_entry['status'])
+    
+    logger.info("Final workflow state",
+               state_keys=[k for k in result['workflow_state'].keys() if not k.startswith('_')])
     
     print("\n" + "="*50)
     print("📋 WORKFLOW EXECUTION SUMMARY")
     print("="*50)
-    
     print(f"✅ Completed Nodes: {len(result['completed_nodes'])}")
     print(f"🔄 Total Iterations: {result['total_iterations']}")
     print(f"📊 Execution Log Entries: {len(result['execution_log'])}")
-    
-    print("\n🔍 Execution Details:")
-    for log_entry in result['execution_log']:
-        status_icon = "✅" if log_entry['status'] == 'completed' else "❌"
-        print(f"  {status_icon} Iteration {log_entry['iteration']}: {log_entry['node']} - {log_entry['status']}")
-    
-    print("\n🎯 Final Workflow State:")
-    for key, value in result['workflow_state'].items():
-        if not key.startswith('_'):
-            print(f"  {key}: {value}")
