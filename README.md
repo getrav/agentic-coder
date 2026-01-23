@@ -75,6 +75,18 @@ The supervisor coordinates agents through a structured workflow:
 4. **Error Handling**: Graceful handling of agent failures
 5. **Modular Design**: Easy to add new agents and workflow patterns
 
+## Stuck Issue Detection
+
+This system now includes comprehensive stuck issue detection capabilities:
+
+- **Automatic Detection**: Identifies stuck agents and workflows
+- **Multiple Issue Types**: Timeout, no progress, blocked workflows, infinite loops, deadlocks
+- **Recovery Mechanisms**: Automatic recovery from detected issues
+- **Real-time Monitoring**: Background monitoring with configurable thresholds
+- **Detailed Reporting**: Comprehensive issue summaries and diagnostics
+
+See `STUCK_ISSUE_DETECTION_README.md` for detailed documentation and usage examples.
+
 ## Future Enhancements
 
 - Integration with actual LangGraph libraries
@@ -82,3 +94,5 @@ The supervisor coordinates agents through a structured workflow:
 - Distributed agent execution
 - Real-time monitoring and debugging
 - Persistent workflow storage
+- Machine learning-based issue prediction
+- Web dashboard for monitoring
