@@ -1,0 +1,27 @@
+{"timestamp":"2026-01-23T01:34:07.502920Z","level":"INFO","logger":"demo","message":"SQLite Checkpoint Persistence System Demo","component":"main","action":"start_demo"}
+{"timestamp":"2026-01-23T01:34:07.504554Z","level":"INFO","logger":"demo","message":"Components initialized","database_path":"demo_checkpoints.db","components":["persistence","saver","loader","manager"]}
+{"timestamp":"2026-01-23T01:34:07.504615Z","level":"INFO","logger":"demo","message":"Starting basic checkpoint operations","demo_section":"basic_operations","step":1}
+{"timestamp":"2026-01-23T01:34:07.504653Z","level":"INFO","logger":"demo","message":"Created session","session_id":"demo_session_001"}
+{"timestamp":"2026-01-23T01:34:07.506180Z","level":"INFO","logger":"demo","message":"Checkpoint saved successfully","checkpoint_id":"demo_checkpoint_0","session_id":"demo_session_001","step":1}
+{"timestamp":"2026-01-23T01:34:07.507392Z","level":"INFO","logger":"demo","message":"Checkpoint saved successfully","checkpoint_id":"demo_checkpoint_1","session_id":"demo_session_001","step":2}
+{"timestamp":"2026-01-23T01:34:07.508545Z","level":"INFO","logger":"demo","message":"Checkpoint saved successfully","checkpoint_id":"demo_checkpoint_2","session_id":"demo_session_001","step":3}
+{"timestamp":"2026-01-23T01:34:07.508595Z","level":"INFO","logger":"demo","message":"Basic checkpoint operations completed","total_attempted":3,"total_saved":3,"success_rate":1.0}
+{"timestamp":"2026-01-23T01:34:07.508627Z","level":"INFO","logger":"demo","message":"Starting enhanced checkpoint saving","demo_section":"enhanced_saving","step":2}
+{"timestamp":"2026-01-23T01:34:07.510945Z","level":"INFO","logger":"demo","message":"Auto checkpoint saved","checkpoint_id":"auto_a3132082","session_id":"demo_session_001","trigger":"timer"}
+{"timestamp":"2026-01-23T01:34:07.512317Z","level":"INFO","logger":"demo","message":"Manual checkpoint saved","checkpoint_id":"manual_b12a8d62","session_id":"demo_session_001","user":"demo_user","description":"Manual save during demo"}
+{"timestamp":"2026-01-23T01:34:07.512362Z","level":"INFO","logger":"demo","message":"Starting checkpoint loading and querying","demo_section":"loading_querying","step":3}
+{"timestamp":"2026-01-23T01:34:07.512878Z","level":"INFO","logger":"demo","message":"Loaded session checkpoints","session_id":"demo_session_001","checkpoint_count":7}
+{"timestamp":"2026-01-23T01:34:07.511157","level":"INFO","logger":"demo","message":"Loaded latest checkpoint","session_id":"demo_session_001","checkpoint_id":"manual_b12a8d62"}
+{"timestamp":"2026-01-23T01:34:07.513870Z","level":"INFO","logger":"demo","message":"Searched checkpoints","session_id":"demo_session_001","search_term":"manual","results_count":2}
+{"timestamp":"2026-01-23T01:34:07.513915Z","level":"INFO","logger":"demo","message":"Starting checkpoint management","demo_section":"checkpoint_management","step":4}
+{"timestamp":"2026-01-23T01:34:07.515600Z","level":"INFO","logger":"demo","message":"Retrieved storage statistics","total_checkpoints":12,"database_size_mb":0.02}
+{"timestamp":"2026-01-23T01:34:07.523720Z","level":"INFO","logger":"demo","message":"Performed cleanup by size limit","max_checkpoints":5,"deleted_count":7}
+{"timestamp":"2026-01-23T01:34:07.523775Z","level":"INFO","logger":"demo","message":"Starting batch operations","demo_section":"batch_operations","step":5}
+{"timestamp":"2026-01-23T01:34:07.530211Z","level":"INFO","logger":"demo","message":"Batch save completed","session_id":"batch_demo_session","attempted":5,"successful":5,"success_rate":1.0}
+{"timestamp":"2026-01-23T01:34:07.532872Z","level":"INFO","logger":"demo","message":"Batch load completed","session_id":"batch_demo_session","attempted":5,"successful":5,"success_rate":1.0}
+{"timestamp":"2026-01-23T01:34:07.532930Z","level":"INFO","logger":"demo","message":"Starting checkpoint data model demo","demo_section":"data_model","step":6}
+{"timestamp":"2026-01-23T01:34:07.533016Z","level":"INFO","logger":"demo","message":"Checkpoint model created successfully","checkpoint_id":"model_demo_001","session_id":"demo_session_001","data_keys":["model","structured"]}
+{"timestamp":"2026-01-23T01:34:07.533057Z","level":"INFO","logger":"demo","message":"Starting system maintenance","demo_section":"maintenance","step":7}
+{"timestamp":"2026-01-23T01:34:07.540694Z","level":"INFO","logger":"demo","message":"Maintenance completed successfully","operations_count":3,"config":{"max_age_days":30,"max_checkpoints":50,"create_backup":true,"remove_duplicates":true}}
+{"timestamp":"2026-01-23T01:34:07.541912Z","level":"INFO","logger":"demo","message":"Final system statistics","final_checkpoint_count":10,"final_database_size_mb":0.02,"database_path":"demo_checkpoints.db","backup_path":"backups"}
+{"timestamp":"2026-01-23T01:34:07.541973Z","level":"INFO","logger":"demo","message":"Demo completed successfully","total_demos":7,"final_status":"success"}

@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "manual_b12a8d62",
+  "session_id": "demo_session_001",
+  "timestamp": "2026-01-23T01:34:07.511000",
+  "data": {
+    "manual": true,
+    "user_action": "save_point",
+    "value": "manual_save"
+  },
+  "metadata": {
+    "created_at": "2026-01-23T01:34:07.511000",
+    "version": "1.0",
+    "environment": "manual",
+    "user_id": "demo_user",
+    "description": "Manual save during demo",
+    "manual_created": true
+  }
+}

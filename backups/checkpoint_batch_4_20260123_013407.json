@@ -1,0 +1,15 @@
+{
+  "checkpoint_id": "batch_4",
+  "session_id": "batch_demo_session",
+  "timestamp": "2026-01-23T01:34:07.528991",
+  "data": {
+    "batch_id": 4,
+    "processed": false,
+    "timestamp": "2026-01-23T01:34:07.523868"
+  },
+  "metadata": {
+    "created_at": "2026-01-23T01:34:07.528991",
+    "version": "1.0",
+    "environment": "default"
+  }
+}
