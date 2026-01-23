@@ -1,0 +1,8 @@
+Checkpoint Recovery Log
+==================================================
+[2026-01-23T01:10:07.236388] RECOVERY_ATTEMPT: Starting recovery for session test_strategies_001 using latest strategy (Checkpoint: test_strategies_001)
+[2026-01-23T01:10:07.237018] RECOVERY_SUCCESS: Successfully recovered session test_strategies_001 (Checkpoint: auto_07e54eee)
+[2026-01-23T01:10:07.237079] RECOVERY_ATTEMPT: Starting recovery for session test_strategies_001 using rollback strategy (Checkpoint: test_strategies_001)
+[2026-01-23T01:10:07.237651] RECOVERY_SUCCESS: Successfully recovered session test_strategies_001 (Checkpoint: auto_8879a154)
+[2026-01-23T01:10:07.237719] RECOVERY_ATTEMPT: Starting recovery for session test_strategies_001 using health_check strategy (Checkpoint: test_strategies_001)
+[2026-01-23T01:10:07.238314] RECOVERY_SUCCESS: Successfully recovered session test_strategies_001 (Checkpoint: auto_07e54eee)
