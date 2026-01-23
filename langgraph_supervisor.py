@@ -7,6 +7,24 @@ class AgentState(Enum):
     RUNNING = "running" 
     COMPLETED = "completed"
     FAILED = "failed"
+    BLOCKED = "blocked"
+
+class EscalationLevel(Enum):
+    """Escalation levels for blocked tasks."""
+    LEVEL_1 = "level_1"  # Automatic retry
+    LEVEL_2 = "level_2"  # Supervisor intervention
+    LEVEL_3 = "level_3"  # Manual escalation
+
+@dataclass
+class BlockedTask:
+    """Represents a blocked task that needs escalation."""
+    task_id: str
+    agent_name: str
+    error: str
+    escalation_level: EscalationLevel
+    retry_count: int = 0
+    max_retries: int = 3
+    context: Optional[Dict[str, Any]] = None
 
 @dataclass
 class WorkflowNode:
@@ -44,6 +62,15 @@ class LangGraphSupervisorAgent:
         self.agents: Dict[str, Callable] = {}
         self.graph = WorkflowGraph()
         self.workflow_state: Dict[str, Any] = {}
+        self.blocked_tasks: List[BlockedTask] = []
+        self.escalation_handlers: Dict[EscalationLevel, Callable] = {}
+        self._setup_default_escalation_handlers()
+    
+    def _setup_default_escalation_handlers(self):
+        """Setup default escalation handlers."""
+        self.escalation_handlers[EscalationLevel.LEVEL_1] = self._handle_level1_escalation
+        self.escalation_handlers[EscalationLevel.LEVEL_2] = self._handle_level2_escalation
+        self.escalation_handlers[EscalationLevel.LEVEL_3] = self._handle_level3_escalation
         
     def register_agent(self, name: str, agent_func: Callable):
         """Register an agent with the supervisor"""
@@ -115,9 +142,138 @@ class LangGraphSupervisorAgent:
             else:
                 raise Exception(f"Agent {node_name} not found")
         except Exception as e:
-            node.state = AgentState.FAILED
+            node.state = AgentState.BLOCKED
             node.error = str(e)
-            raise
+            # Handle blocked task with escalation
+            task_id = f"node_{node_name}"
+            escalation_result = self.handle_blocked_task(task_id, node_name, str(e), input_data)
+            # Return escalation result instead of raising exception
+            return escalation_result
+    
+    def handle_blocked_task(self, task_id: str, agent_name: str, error: str, 
+                          context: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle a blocked task by escalating it appropriately."""
+        # Create blocked task record
+        blocked_task = BlockedTask(
+            task_id=task_id,
+            agent_name=agent_name,
+            error=error,
+            escalation_level=EscalationLevel.LEVEL_1,
+            context=context
+        )
+        
+        # Add to blocked tasks list
+        self.blocked_tasks.append(blocked_task)
+        
+        # Handle escalation
+        return self._escalate_task(blocked_task)
+    
+    def _escalate_task(self, blocked_task: BlockedTask) -> Dict[str, Any]:
+        """Escalate a blocked task using appropriate handler."""
+        handler = self.escalation_handlers.get(blocked_task.escalation_level)
+        if handler:
+            return handler(blocked_task)
+        else:
+            return {
+                "status": "failed",
+                "error": f"No escalation handler for level {blocked_task.escalation_level}",
+                "task_id": blocked_task.task_id
+            }
+    
+    def _handle_level1_escalation(self, blocked_task: BlockedTask) -> Dict[str, Any]:
+        """Level 1 escalation: Automatic retry with limited attempts."""
+        if blocked_task.retry_count < blocked_task.max_retries:
+            blocked_task.retry_count += 1
+            print(f"🔄 Retrying blocked node {blocked_task.task_id} (attempt {blocked_task.retry_count})")
+            
+            # Try to execute the agent again
+            try:
+                result = self.agents[blocked_task.agent_name](blocked_task.context or {})
+                
+                if result:
+                    # Remove from blocked tasks if successful
+                    if blocked_task in self.blocked_tasks:
+                        self.blocked_tasks.remove(blocked_task)
+                    print(f"✅ Node {blocked_task.task_id} unblocked after retry")
+                    return {"status": "success", "result": result, "retry_success": True}
+            except Exception as e:
+                print(f"❌ Retry failed for node {blocked_task.task_id}: {e}")
+            
+            # Escalate to next level if retry failed
+            blocked_task.escalation_level = EscalationLevel.LEVEL_2
+            return self._escalate_task(blocked_task)
+        else:
+            # Max retries reached, escalate to level 2
+            blocked_task.escalation_level = EscalationLevel.LEVEL_2
+            return self._escalate_task(blocked_task)
+    
+    def _handle_level2_escalation(self, blocked_task: BlockedTask) -> Dict[str, Any]:
+        """Level 2 escalation: Supervisor intervention and alternative routing."""
+        print(f"⚠️ Supervisor intervention for blocked node {blocked_task.task_id}")
+        print(f"   Error: {blocked_task.error}")
+        print(f"   Node: {blocked_task.agent_name}")
+        
+        # Try to find an alternative node/path
+        alternative_nodes = [name for name in self.agents.keys() 
+                           if name != blocked_task.agent_name]
+        
+        if alternative_nodes:
+            # Try the first alternative node
+            alternative_node = alternative_nodes[0]
+            print(f"   Trying alternative node: {alternative_node}")
+            
+            try:
+                result = self.agents[alternative_node](blocked_task.context or {})
+                if result:
+                    if blocked_task in self.blocked_tasks:
+                        self.blocked_tasks.remove(blocked_task)
+                    print(f"✅ Node {blocked_task.task_id} completed with alternative")
+                    return {"status": "success", "result": result, "alternative_used": alternative_node}
+            except Exception as e:
+                print(f"   Alternative node also failed: {e}")
+        
+        # If alternative nodes fail, escalate to level 3
+        blocked_task.escalation_level = EscalationLevel.LEVEL_3
+        return self._escalate_task(blocked_task)
+    
+    def _handle_level3_escalation(self, blocked_task: BlockedTask) -> Dict[str, Any]:
+        """Level 3 escalation: Manual escalation to human supervisor."""
+        print(f"🚨 CRITICAL: Node {blocked_task.task_id} requires manual intervention")
+        print(f"   Node ID: {blocked_task.task_id}")
+        print(f"   Original Node: {blocked_task.agent_name}")
+        print(f"   Error: {blocked_task.error}")
+        print(f"   Context: {blocked_task.context}")
+        
+        # Create escalation record for manual review
+        escalation_record = {
+            "node_id": blocked_task.task_id,
+            "agent_name": blocked_task.agent_name,
+            "error": blocked_task.error,
+            "escalation_level": blocked_task.escalation_level.value,
+            "timestamp": "manual",
+            "status": "awaiting_human_intervention",
+            "requires_manual_review": True
+        }
+        
+        return {
+            "status": "escalated",
+            "escalation_record": escalation_record,
+            "message": f"Node {blocked_task.task_id} escalated for manual review"
+        }
+    
+    def get_blocked_tasks(self) -> List[Dict[str, Any]]:
+        """Get list of currently blocked tasks."""
+        return [
+            {
+                "task_id": task.task_id,
+                "agent_name": task.agent_name,
+                "error": task.error,
+                "escalation_level": task.escalation_level.value,
+                "retry_count": task.retry_count,
+                "max_retries": task.max_retries
+            }
+            for task in self.blocked_tasks
+        ]
     
     def run_workflow(self, initial_input: Dict[str, Any], max_iterations: int = 20) -> Dict[str, Any]:
         """Run the workflow using LangGraph-style execution"""
