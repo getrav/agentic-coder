@@ -4,7 +4,7 @@ import os
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 
-from .github_pr_client import GitHubPRClient, GitHubConfig, PRInfo, create_github_config_from_env
+from github_pr_client import GitHubPRClient, GitHubConfig, PRInfo, create_github_config_from_env
 from beadsclient.client import BeadsClient
 
 
