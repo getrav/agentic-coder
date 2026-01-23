@@ -1,6 +1,8 @@
 from typing import Dict, List, Any, Optional, Callable, TypedDict
 from dataclasses import dataclass
 from enum import Enum
+import asyncio
+from recovery_loop import RecoveryLoop, RecoveryStrategy
 
 class AgentState(Enum):
     PENDING = "pending"
@@ -40,14 +42,35 @@ class WorkflowGraph:
             self.add_node(name)
 
 class LangGraphSupervisorAgent:
-    def __init__(self):
+    def __init__(self, enable_recovery: bool = True, recovery_config: Optional[Dict[str, Any]] = None):
         self.agents: Dict[str, Callable] = {}
         self.graph = WorkflowGraph()
         self.workflow_state: Dict[str, Any] = {}
+        self.alternative_agents: Dict[str, Callable] = {}
         
-    def register_agent(self, name: str, agent_func: Callable):
+        # Initialize RecoveryLoop
+        self.enable_recovery = enable_recovery
+        if enable_recovery:
+            recovery_config = recovery_config or {}
+            self.recovery_loop = RecoveryLoop(
+                max_retries=recovery_config.get('max_retries', 3),
+                default_strategy=RecoveryStrategy(recovery_config.get('default_strategy', 'exponential_backoff')),
+                base_delay_ms=recovery_config.get('base_delay_ms', 1000),
+                max_delay_ms=recovery_config.get('max_delay_ms', 30000),
+                circuit_breaker_threshold=recovery_config.get('circuit_breaker_threshold', 3)
+            )
+        else:
+            self.recovery_loop = None
+        
+    def register_agent(self, name: str, agent_func: Callable, is_fallback: bool = False):
         """Register an agent with the supervisor"""
-        self.agents[name] = agent_func
+        if is_fallback:
+            self.alternative_agents[name] = agent_func
+        else:
+            self.agents[name] = agent_func
+            # Register circuit breaker for primary agents if recovery is enabled
+            if self.enable_recovery and self.recovery_loop:
+                self.recovery_loop.register_circuit_breaker(name)
         
     def create_workflow(self):
         """Create a sample workflow graph"""
@@ -100,26 +123,67 @@ class LangGraphSupervisorAgent:
                     next_nodes.append(edge.to_node)
         return next_nodes
     
-    def execute_node(self, node_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single node/agent"""
+    async def execute_node(self, node_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a single node/agent with recovery if enabled"""
         node = self.graph.nodes[node_name]
         node.state = AgentState.RUNNING
         node.input_data = input_data
         
         try:
-            if node_name in self.agents:
-                result = self.agents[node_name](input_data)
+            if node_name not in self.agents:
+                raise Exception(f"Agent {node_name} not found")
+            
+            agent_func = self.agents[node_name]
+            
+            # Use recovery loop if enabled
+            if self.enable_recovery and self.recovery_loop:
+                recovery_strategies = [
+                    RecoveryStrategy.EXPONENTIAL_BACKOFF,
+                    RecoveryStrategy.ALTERNATIVE_AGENT,
+                    RecoveryStrategy.FALLBACK_DEFAULT
+                ]
+                
+                fallback_result = {"status": "fallback_executed", "data": input_data}
+                
+                result = await self.recovery_loop.execute_with_recovery(
+                    agent_name=node_name,
+                    agent_func=agent_func,
+                    input_data=input_data,
+                    strategies=recovery_strategies,
+                    alternative_agents=self.alternative_agents,
+                    fallback_result=fallback_result
+                )
+                
+                # Update node state based on recovery result
+                if result.get("status") == "success":
+                    node.state = AgentState.COMPLETED
+                    node.output_data = result["result"]
+                    return result["result"]
+                elif result.get("status") == "fallback":
+                    node.state = AgentState.COMPLETED
+                    node.output_data = result["result"]
+                    return result["result"]
+                else:
+                    node.state = AgentState.FAILED
+                    node.error = result.get("error", "Recovery failed")
+                    raise Exception(node.error)
+            else:
+                # Original execution logic without recovery
+                if asyncio.iscoroutinefunction(agent_func):
+                    result = await agent_func(input_data)
+                else:
+                    result = agent_func(input_data)
+                
                 node.output_data = result
                 node.state = AgentState.COMPLETED
                 return result
-            else:
-                raise Exception(f"Agent {node_name} not found")
+                
         except Exception as e:
             node.state = AgentState.FAILED
             node.error = str(e)
             raise
     
-    def run_workflow(self, initial_input: Dict[str, Any], max_iterations: int = 20) -> Dict[str, Any]:
+    async def run_workflow(self, initial_input: Dict[str, Any], max_iterations: int = 20) -> Dict[str, Any]:
         """Run the workflow using LangGraph-style execution"""
         if not self.graph.nodes:
             self.create_workflow()
@@ -144,7 +208,7 @@ class LangGraphSupervisorAgent:
                     
                 try:
                     # Execute current node
-                    result = self.execute_node(node_name, self.workflow_state)
+                    result = await self.execute_node(node_name, self.workflow_state)
                     
                     # Update workflow state
                     self.workflow_state[f"{node_name}_result"] = result
@@ -170,8 +234,9 @@ class LangGraphSupervisorAgent:
                         "status": "failed",
                         "error": str(e)
                     })
-                    # Stop execution on failure
-                    break
+                    # Don't stop execution on failure when recovery is enabled - continue with other nodes
+                    if not self.enable_recovery:
+                        break
             
             # Remove duplicates from next nodes
             current_nodes = list(set(next_nodes))
@@ -184,8 +249,20 @@ class LangGraphSupervisorAgent:
             "workflow_state": self.workflow_state,
             "execution_log": execution_log,
             "completed_nodes": list(completed_nodes),
-            "total_iterations": iteration
+            "total_iterations": iteration,
+            "recovery_stats": self.get_recovery_stats() if self.enable_recovery else None
         }
+    
+    def get_recovery_stats(self) -> Optional[Dict[str, Any]]:
+        """Get recovery statistics if recovery is enabled"""
+        if self.enable_recovery and self.recovery_loop:
+            return self.recovery_loop.get_recovery_stats()
+        return None
+    
+    def reset_circuit_breakers(self):
+        """Reset all circuit breakers"""
+        if self.enable_recovery and self.recovery_loop:
+            self.recovery_loop.reset_circuit_breakers()
 
 # Example agents for the workflow
 def input_processing_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -282,9 +359,36 @@ def output_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
     
     return {"final_output": output}
 
-if __name__ == "__main__":
+# Fallback agents for recovery
+def input_processing_fallback_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fallback input processing agent"""
+    print("🔄 Input Processing (Fallback): Using simplified processing...")
+    
+    processed = {
+        "validated": True,
+        "normalized": False,  # Simplified processing
+        "data_type": "basic",
+        "quality_score": 0.6  # Lower quality for fallback
+    }
+    
+    return {"processed_input": processed}
+
+def analysis_fallback_agent(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fallback analysis agent"""
+    print("🔍 Analysis (Fallback): Using basic analysis...")
+    
+    analysis = {
+        "complexity": "low",
+        "risk_level": "unknown",
+        "insights": ["basic_analysis_only"],
+        "confidence": 0.5  # Lower confidence for fallback
+    }
+    
+    return {"analysis_result": analysis}
+
+async def main():
     # Create LangGraph-style Supervisor Agent
-    supervisor = LangGraphSupervisorAgent()
+    supervisor = LangGraphSupervisorAgent(enable_recovery=True)
     
     # Register all agents
     supervisor.register_agent("input_processing", input_processing_agent)
@@ -293,6 +397,10 @@ if __name__ == "__main__":
     supervisor.register_agent("execution", execution_agent)
     supervisor.register_agent("validation", validation_agent)
     supervisor.register_agent("output", output_agent)
+    
+    # Register some fallback agents
+    supervisor.register_agent("input_processing_fallback", input_processing_fallback_agent, is_fallback=True)
+    supervisor.register_agent("analysis_fallback", analysis_fallback_agent, is_fallback=True)
     
     # Create workflow graph
     supervisor.create_workflow()
@@ -304,8 +412,8 @@ if __name__ == "__main__":
         "priority": "high"
     }
     
-    print("🚀 Starting LangGraph-style Supervised Workflow...")
-    result = supervisor.run_workflow(initial_input)
+    print("🚀 Starting LangGraph-style Supervised Workflow with Recovery...")
+    result = await supervisor.run_workflow(initial_input)
     
     print("\n" + "="*50)
     print("📋 WORKFLOW EXECUTION SUMMARY")
@@ -314,6 +422,12 @@ if __name__ == "__main__":
     print(f"✅ Completed Nodes: {len(result['completed_nodes'])}")
     print(f"🔄 Total Iterations: {result['total_iterations']}")
     print(f"📊 Execution Log Entries: {len(result['execution_log'])}")
+    
+    # Print recovery stats if available
+    if result.get('recovery_stats'):
+        stats = result['recovery_stats']
+        print(f"🛟 Recovery Attempts: {stats['total_attempts']}")
+        print(f"🛟 Recovery Success Rate: {stats['success_rate']:.2%}")
     
     print("\n🔍 Execution Details:")
     for log_entry in result['execution_log']:
@@ -324,3 +438,7 @@ if __name__ == "__main__":
     for key, value in result['workflow_state'].items():
         if not key.startswith('_'):
             print(f"  {key}: {value}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
