@@ -1,0 +1,29 @@
+[Unit]
+Description=HealthMonitor Daemon - Background async monitoring service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/gt/ac/polecats/quartz/ac
+ExecStart=/usr/bin/python3 health_monitor_cli.py start --log-level INFO
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PYTHONPATH=/gt/ac/polecats/quartz/ac/src
+Environment=PYTHONUNBUFFERED=1
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/gt/ac/polecats/quartz/ac
+ProtectHome=true
+RemoveIPC=true
+
+[Install]
+WantedBy=multi-user.target
