@@ -1,6 +1,6 @@
-# Agentic Coder with HealthMonitor
+# Agentic Coder with HealthMonitor & GitHub Webhook Integration
 
-This project implements a multi-agent coding system with workspace isolation and health monitoring.
+This project implements a multi-agent coding system with workspace isolation, health monitoring, and GitHub webhook integration.
 
 ## Features
 
@@ -10,6 +10,7 @@ This project implements a multi-agent coding system with workspace isolation and
 - **Workflow Management**: Conditional routing between agents based on execution results
 - **HealthMonitor Daemon**: Background async monitoring service for system health and recovery
 - **Workspace Isolation**: Git worktree-based isolation for agent workspaces
+- **GitHub Webhook Integration**: Handles GitHub webhook events (issues.opened, issue_comment)
 
 ## Files
 
@@ -18,6 +19,8 @@ This project implements a multi-agent coding system with workspace isolation and
 - `src/agentic_coder/health_monitor.py`: HealthMonitor daemon implementation
 - `health_monitor_cli.py`: Command-line interface for HealthMonitor
 - `src/agentic_coder/workspace/agent_workspace.py`: Agent workspace management
+- `github_webhook.py`: GitHub webhook handler and Flask server
+- `webhook_cli.py`: Command-line interface for webhook management
 - `requirements.txt`: Python dependencies (for when LangGraph libraries are available)
 
 ## Usage
@@ -109,6 +112,51 @@ python3 health_monitor_cli.py list
 
 For detailed documentation, see [HEALTHMONITOR.md](HEALTHMONITOR.md).
 
+## GitHub Webhook Integration
+
+The project includes GitHub webhook integration that handles:
+
+- **issues.opened**: Processes when new issues are created
+- **issue_comment**: Processes when comments are created, edited, or deleted on issues
+
+### Setup
+
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+2. Configure environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+3. Start the webhook server:
+```bash
+python webhook_cli.py start
+```
+
+### Testing
+
+Generate sample events:
+```bash
+python webhook_cli.py generate-samples
+```
+
+Test webhook events:
+```bash
+python webhook_cli.py test sample_events/issue_opened.json --event-type issues
+python webhook_cli.py test sample_events/issue_comment_created.json --event-type issue_comment
+```
+
+### Configuration
+
+- `GITHUB_WEBHOOK_SECRET`: GitHub webhook secret for signature verification
+- `WEBHOOK_HOST`: Server host (default: 0.0.0.0)
+- `WEBHOOK_PORT`: Server port (default: 5000)
+- `WEBHOOK_DEBUG`: Enable debug mode (default: false)
+
 ## Future Enhancements
 
 - Integration with actual LangGraph libraries
@@ -118,3 +166,5 @@ For detailed documentation, see [HEALTHMONITOR.md](HEALTHMONITOR.md).
 - Persistent workflow storage
 - Auto-scaling based on health metrics
 - Integration with external monitoring systems
+- Additional GitHub event types
+- Webhook event storage and replay

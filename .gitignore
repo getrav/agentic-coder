@@ -55,3 +55,8 @@ Thumbs.db
 # Gas Town (added by gt)
 .claude/
 .logs/
+
+# Webhook
+.env
+sample_events/
+*.log
